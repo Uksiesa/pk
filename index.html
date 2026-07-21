@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<title>Parkkakorpi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0E1310">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Parkkakorpi">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --pohja:#0E1310;
+    --paneeli:rgba(14,19,16,.82);
+    --reuna:rgba(232,238,228,.14);
+    --luu:#EAEEE6;
+    --vaimea:#7E8C7A;
+    --messinki:#D8B26E;
+    --varoitus:#E8A87C;
+    --tila:env(safe-area-inset-top,0px);
+    --tila-ala:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{
+    height:100%;overflow:hidden;background:var(--pohja);color:var(--luu);
+    font:400 15px/1.35 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%;
+    -webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
+    overscroll-behavior:none;
+  }
+  #kartta{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+
+  #luku{
+    position:fixed;top:0;left:0;right:0;
+    padding:calc(var(--tila) + 10px) 14px 11px;
+    background:linear-gradient(to bottom,rgba(14,19,16,.94) 55%,rgba(14,19,16,0));
+    display:flex;align-items:flex-start;gap:14px;pointer-events:none;
+  }
+  .lohko{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .lohko.oikea{margin-left:auto;text-align:right;flex-shrink:0}
+  .otsake{font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--vaimea);white-space:nowrap}
+  .arvo{
+    font:500 15px/1.2 ui-monospace,"SF Mono",Menlo,monospace;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap;
+  }
+  .arvo.iso{font-size:19px}
+  .arvo.karkea{color:var(--varoitus)}
+
+  #syke{display:inline-block;width:6px;height:6px;border-radius:50%;
+        background:var(--messinki);margin-left:6px;vertical-align:2px;opacity:.25}
+  #syke.osuma{animation:valahda .9s ease-out}
+  @keyframes valahda{0%{opacity:1;transform:scale(1.6)}100%{opacity:.25;transform:scale(1)}}
+
+  #viesti{
+    position:fixed;left:14px;right:14px;top:calc(var(--tila) + 64px);
+    padding:11px 13px;background:var(--paneeli);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--reuna);border-left:2px solid var(--messinki);
+    border-radius:3px;font-size:13.5px;line-height:1.4;display:none;
+  }
+  #viesti.nakyy{display:block}
+
+  #ohjaus{position:fixed;right:14px;bottom:calc(var(--tila-ala) + 18px);
+          display:flex;flex-direction:column;gap:9px}
+  .nappi{
+    width:56px;height:56px;display:flex;align-items:center;justify-content:center;
+    background:var(--paneeli);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--reuna);border-radius:3px;color:var(--luu);cursor:pointer;
+    -webkit-tap-highlight-color:transparent;transition:border-color .16s,color .16s;
+  }
+  .nappi:active{border-color:rgba(232,238,228,.4)}
+  .nappi:focus-visible{outline:2px solid var(--messinki);outline-offset:2px}
+  .nappi.paalla{color:var(--messinki);border-color:rgba(216,178,110,.55)}
+  .nappi[hidden]{display:none}
+  .nappi svg{width:24px;height:24px;fill:none;stroke:currentColor;
+             stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .parinappi{display:flex;flex-direction:column;gap:1px}
+  .parinappi .nappi:first-child{border-radius:3px 3px 0 0}
+  .parinappi .nappi:last-child{border-radius:0 0 3px 3px}
+
+  #jana{position:fixed;left:14px;bottom:calc(var(--tila-ala) + 18px);pointer-events:none}
+  #janaviiva{height:7px;border:1px solid var(--luu);border-top:none;
+             background:rgba(14,19,16,.5);transition:width .18s ease-out}
+  #janateksti{font:500 11px/1 ui-monospace,"SF Mono",Menlo,monospace;color:var(--luu);
+              margin-bottom:4px;text-shadow:0 0 4px rgba(14,19,16,.9)}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="kartta"></canvas>
+
+<div id="luku">
+  <div class="lohko">
+    <span class="otsake">ETRS-TM35FIN</span>
+    <span class="arvo" id="koord">– – –<span id="syke"></span></span>
+  </div>
+  <div class="lohko oikea">
+    <span class="otsake">Tarkkuus</span>
+    <span class="arvo iso" id="tarkkuus">–</span>
+  </div>
+</div>
+
+<div id="viesti"></div>
+
+<div id="ohjaus">
+  <button class="nappi" id="nappi-kompassi" hidden aria-label="Ota kompassi käyttöön">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/>
+    <path d="M15.5 8.5l-2.2 4.8-4.8 2.2 2.2-4.8z" fill="currentColor" stroke="none"/></svg>
+  </button>
+  <button class="nappi paalla" id="nappi-seuraa" aria-label="Seuraa sijaintia">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.4"/>
+    <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
+  </button>
+  <div class="parinappi">
+    <button class="nappi" id="nappi-lahemmas" aria-label="Lähennä">
+      <svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
+    <button class="nappi" id="nappi-kauemmas" aria-label="Loitonna">
+      <svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+  </div>
+</div>
+
+<div id="jana">
+  <div id="janateksti">–</div>
+  <div id="janaviiva" style="width:80px"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
