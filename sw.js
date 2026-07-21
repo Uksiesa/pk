@@ -1,4 +1,4 @@
-const VARASTO = 'parkkakorpi-v3';
+const VARASTO = 'parkkakorpi-v4';
 const TIEDOSTOT = ['./', './index.html', './app.js', './manifest.json', './kartta.jpg'];
 
 self.addEventListener('install', e => {
